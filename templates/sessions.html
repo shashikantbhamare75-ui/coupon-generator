@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sessions - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; }
+        .navbar-brand { font-weight: 700; }
+        .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .status-badge { font-size: 0.75rem; padding: 0.35em 0.7em; border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/dashboard">🍽️ Food Coupon Generator</a>
+            <div>
+                <a href="/dashboard" class="btn btn-outline-secondary btn-sm me-2">Dashboard</a>
+                <button id="logoutBtn" class="btn btn-outline-danger btn-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="card p-4">
+                    <h5 class="fw-bold mb-3">Create Session</h5>
+                    <div id="formAlert" class="alert d-none" role="alert"></div>
+                    <form id="sessionForm">
+                        <div class="mb-3">
+                            <label class="form-label">Session Name</label>
+                            <input type="text" class="form-control" id="session_name" placeholder="AI Workshop" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Session Date</label>
+                                <input type="date" class="form-control" id="session_date" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Attendees</label>
+                                <input type="number" min="1" class="form-control" id="attendee_count" placeholder="100" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" class="form-control" id="start_time">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">End Time</label>
+                                <input type="time" class="form-control" id="end_time">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Food Item / Menu</label>
+                            <input type="text" class="form-control" id="food_item" placeholder="Lunch">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-semibold" id="createBtn">Create Session</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card p-4">
+                    <h5 class="fw-bold mb-3">All Sessions</h5>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Date</th>
+                                    <th>Attendees</th>
+                                    <th>Coupons</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessionsTableBody">
+                                <tr><td colspan="5" class="text-muted text-center py-3">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        if (!token) window.location.href = '/';
+
+        const authHeaders = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        };
+
+        async function loadSessions() {
+            const res = await fetch('/api/sessions', { headers: authHeaders });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            const data = await res.json();
+            const tbody = document.getElementById('sessionsTableBody');
+
+            if (!data.sessions || data.sessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No sessions yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.sessions.map(s => `
+                <tr>
+                    <td class="fw-semibold">${s.session_name}</td>
+                    <td>${s.session_date}</td>
+                    <td>${s.attendee_count}</td>
+                    <td>
+                        ${s.coupons_generated
+                            ? `<span class="badge bg-success status-badge">${s.stats.total_coupons} generated</span>`
+                            : `<span class="badge bg-secondary status-badge">Not generated</span>`}
+                    </td>
+                    <td>
+                        <a href="/sessions/${s.id}/generate" class="btn btn-sm btn-outline-primary">Generate Coupons</a>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('sessionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('formAlert');
+            const btn = document.getElementById('createBtn');
+            alertBox.classList.add('d-none');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            const payload = {
+                session_name: document.getElementById('session_name').value.trim(),
+                session_date: document.getElementById('session_date').value,
+                start_time: document.getElementById('start_time').value,
+                end_time: document.getElementById('end_time').value,
+                food_item: document.getElementById('food_item').value.trim(),
+                attendee_count: document.getElementById('attendee_count').value
+            };
+
+            try {
+                const res = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: authHeaders,
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+                if (data.success) {
+                    alertBox.classList.add('alert-success');
+                    alertBox.textContent = `✅ Session "${data.session.session_name}" created successfully.`;
+                    document.getElementById('sessionForm').reset();
+                    loadSessions();
+                } else {
+                    alertBox.classList.add('alert-danger');
+                    alertBox.textContent = data.message || 'Failed to create session';
+                }
+            } catch (err) {
+                alertBox.classList.remove('d-none');
+                alertBox.classList.add('alert-danger');
+                alertBox.textContent = 'Something went wrong. Please try again.';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Create Session';
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/admin/logout', { method: 'POST', headers: authHeaders });
+            localStorage.removeItem('access_token');
+            window.location.href = '/';
+        });
+
+        loadSessions();
+    </script>
+</body>
+</html>

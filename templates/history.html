@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redemption History - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; }
+        .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/dashboard">🍽️ Food Coupon Generator</a>
+            <div>
+                <a href="/dashboard" class="btn btn-outline-secondary btn-sm me-2">Dashboard</a>
+                <a href="/coupons" class="btn btn-outline-secondary btn-sm">Coupons</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card p-4">
+            <h5 class="fw-bold mb-3">Redemption History</h5>
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search by Coupon ID...">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" id="filterBtn">Filter</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Coupon ID</th>
+                            <th>Session</th>
+                            <th>Session Date</th>
+                            <th>Redeemed At</th>
+                            <th>Redeemed By</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr><td colspan="5" class="text-muted text-center py-3">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        if (!token) window.location.href = '/';
+        const authHeaders = { 'Authorization': 'Bearer ' + token };
+
+        async function loadHistory() {
+            const search = document.getElementById('searchInput').value.trim();
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+
+            const res = await fetch(`/api/dashboard/history?${params}`, { headers: authHeaders });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            const data = await res.json();
+            const tbody = document.getElementById('historyTableBody');
+
+            if (!data.history || data.history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No redemptions yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.history.map(h => `
+                <tr>
+                    <td class="fw-semibold">${h.coupon_code}</td>
+                    <td>${h.session_name || '-'}</td>
+                    <td>${h.session_date || '-'}</td>
+                    <td>${h.redeemed_at ? new Date(h.redeemed_at).toLocaleString() : '-'}</td>
+                    <td>${h.redeemed_by}</td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('filterBtn').addEventListener('click', loadHistory);
+        document.getElementById('searchInput').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') loadHistory();
+        });
+
+        loadHistory();
+    </script>
+</body>
+</html>

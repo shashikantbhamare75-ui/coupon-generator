@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #ff8a00, #e52e71);
+        }
+        .login-card {
+            max-width: 400px;
+            width: 100%;
+            margin: auto;
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .login-card .card-body { padding: 2.5rem; }
+        .brand-icon { font-size: 2.5rem; }
+    </style>
+</head>
+<body>
+    <div class="card login-card">
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <div class="brand-icon">🍽️</div>
+                <h4 class="fw-bold mt-2">Food Coupon Generator</h4>
+                <p class="text-muted small">Admin Login</p>
+            </div>
+            <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" required autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="loginBtn">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('loginForm');
+        const errorAlert = document.getElementById('errorAlert');
+        const loginBtn = document.getElementById('loginBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorAlert.classList.add('d-none');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include'
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('access_token', data.access_token);
+                    window.location.href = '/dashboard';
+                } else {
+                    errorAlert.textContent = data.message || 'Login failed';
+                    errorAlert.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorAlert.textContent = 'Something went wrong. Please try again.';
+                errorAlert.classList.remove('d-none');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        });
+    </script>
+</body>
+</html>

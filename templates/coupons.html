@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coupons - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; }
+        .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .status-badge { font-size: 0.75rem; padding: 0.35em 0.7em; border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/dashboard">🍽️ Food Coupon Generator</a>
+            <div>
+                <a href="/dashboard" class="btn btn-outline-secondary btn-sm me-2">Dashboard</a>
+                <a href="/sessions" class="btn btn-outline-secondary btn-sm">Sessions</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card p-4">
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search by Coupon ID...">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="UNUSED">Unused</option>
+                        <option value="USED">Used</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" id="filterBtn">Filter</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Coupon ID</th>
+                            <th>Session</th>
+                            <th>Date</th>
+                            <th>Food</th>
+                            <th>Status</th>
+                            <th>Redeemed At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="couponsTableBody">
+                        <tr><td colspan="6" class="text-muted text-center py-3">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        if (!token) window.location.href = '/';
+
+        const authHeaders = { 'Authorization': 'Bearer ' + token };
+
+        async function loadCoupons() {
+            const search = document.getElementById('searchInput').value.trim();
+            const status = document.getElementById('statusFilter').value;
+
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (status) params.append('status', status);
+
+            const res = await fetch(`/api/coupons/detailed?${params}`, { headers: authHeaders });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            const data = await res.json();
+            const tbody = document.getElementById('couponsTableBody');
+
+            if (!data.coupons || data.coupons.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No coupons found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.coupons.map(c => `
+                <tr>
+                    <td class="fw-semibold">${c.coupon_code}</td>
+                    <td>${c.session_name || '-'}</td>
+                    <td>${c.session_date || '-'}</td>
+                    <td>${c.food_item || '-'}</td>
+                    <td>
+                        ${c.status === 'USED'
+                            ? '<span class="badge bg-success status-badge">USED</span>'
+                            : '<span class="badge bg-warning text-dark status-badge">UNUSED</span>'}
+                    </td>
+                    <td>${c.redeemed_at ? new Date(c.redeemed_at).toLocaleString() : '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('filterBtn').addEventListener('click', loadCoupons);
+        document.getElementById('searchInput').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') loadCoupons();
+        });
+
+        loadCoupons();
+    </script>
+</body>
+</html>

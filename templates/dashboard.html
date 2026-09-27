@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; }
+        .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .stat-card { text-align: center; padding: 1.5rem 1rem; }
+        .stat-number { font-size: 2rem; font-weight: 700; }
+        .stat-label { color: #6c757d; font-size: 0.85rem; }
+        .action-btn { padding: 1.5rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/dashboard">🍽️ Food Coupon Generator</a>
+            <div>
+                <a href="/sessions" class="btn btn-outline-secondary btn-sm me-2">Sessions</a>
+                <a href="/coupons" class="btn btn-outline-secondary btn-sm me-2">Coupons</a>
+                <a href="/scan" class="btn btn-outline-secondary btn-sm me-2">Scan</a>
+                <a href="/history" class="btn btn-outline-secondary btn-sm me-2">History</a>                <button id="logoutBtn" class="btn btn-outline-danger btn-sm">Logout</button>
+                </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row g-3 mb-4" id="statsRow">
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card stat-card">
+                    <div class="stat-number text-primary" id="statTotalSessions">–</div>
+                    <div class="stat-label">Total Sessions</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card stat-card">
+                    <div class="stat-number" id="statTotalCoupons">–</div>
+                    <div class="stat-label">Total Coupons</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card stat-card">
+                    <div class="stat-number text-success" id="statUsedCoupons">–</div>
+                    <div class="stat-label">Used</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card stat-card">
+                    <div class="stat-number text-warning" id="statUnusedCoupons">–</div>
+                    <div class="stat-label">Unused</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card stat-card">
+                    <div class="stat-number text-info" id="statTodaysCoupons">–</div>
+                    <div class="stat-label">Today's Coupons</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card stat-card">
+                    <div class="stat-number text-success" id="statTodaysRedemptions">–</div>
+                    <div class="stat-label">Today's Redemptions</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <a href="/sessions" class="card action-btn d-block text-decoration-none text-dark text-center">
+                    ➕ Create Session
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="/coupons" class="card action-btn d-block text-decoration-none text-dark text-center">
+                    📋 View Coupons
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="/scan" class="card action-btn d-block text-decoration-none text-dark text-center">
+                    📷 Scan Coupon
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        if (!token) window.location.href = '/';
+
+        const authHeaders = { 'Authorization': 'Bearer ' + token };
+
+        async function loadStats() {
+            const res = await fetch('/api/dashboard/stats', { headers: authHeaders });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            const data = await res.json();
+            const s = data.stats;
+
+            document.getElementById('statTotalSessions').textContent = s.total_sessions;
+            document.getElementById('statTotalCoupons').textContent = s.total_coupons;
+            document.getElementById('statUsedCoupons').textContent = s.used_coupons;
+            document.getElementById('statUnusedCoupons').textContent = s.unused_coupons;
+            document.getElementById('statTodaysCoupons').textContent = s.todays_coupons;
+            document.getElementById('statTodaysRedemptions').textContent = s.todays_redemptions;
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/admin/logout', { method: 'POST', headers: authHeaders });
+            localStorage.removeItem('access_token');
+            window.location.href = '/';
+        });
+
+        loadStats();
+    </script>
+</body>
+</html>

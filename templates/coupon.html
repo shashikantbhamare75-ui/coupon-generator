@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Food Coupon</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #ff8a00, #e52e71);
+            padding: 20px 0;
+        }
+        .coupon-card {
+            max-width: 380px;
+            width: 100%;
+            margin: auto;
+            border-radius: 20px;
+            border: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+            overflow: hidden;
+        }
+        .coupon-header {
+            background: #212529;
+            color: white;
+            text-align: center;
+            padding: 1.25rem;
+        }
+        .coupon-body { padding: 1.75rem; text-align: center; }
+        .qr-box img { width: 220px; height: 220px; }
+        .coupon-id { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; margin-top: 1rem; }
+        .info-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px dashed #dee2e6; }
+        .info-label { color: #6c757d; font-size: 0.85rem; }
+        .status-badge { font-size: 0.9rem; padding: 0.4em 1em; border-radius: 20px; font-weight: 600; }
+        .footer-note { font-size: 0.8rem; color: #6c757d; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="coupon-card">
+        <div class="coupon-header">
+            <div style="font-size: 1.8rem;">🍽️</div>
+            <h5 class="fw-bold mb-0 mt-1">FOOD COUPON</h5>
+        </div>
+        <div class="coupon-body" id="couponContent">
+            <p class="text-muted">Loading your coupon...</p>
+        </div>
+    </div>
+
+    <script>
+        const token = window.location.pathname.split('/').pop();
+
+        async function loadCoupon() {
+            const container = document.getElementById('couponContent');
+            try {
+                const res = await fetch(`/api/coupons/${token}`);
+                const data = await res.json();
+
+                if (!data.success) {
+                    container.innerHTML = `<p class="text-danger fw-semibold">❌ ${data.message || 'Coupon not found'}</p>`;
+                    return;
+                }
+
+                const c = data.coupon;
+                const s = data.session;
+                const statusBadge = c.status === 'USED'
+                    ? '<span class="badge bg-secondary status-badge">USED</span>'
+                    : '<span class="badge bg-success status-badge">UNUSED</span>';
+
+                container.innerHTML = `
+                    <div class="qr-box mb-3">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(token)}" alt="QR Code">
+                    </div>
+                    <div class="coupon-id">${c.coupon_code}</div>
+                    <div class="mt-3 text-start">
+                        <div class="info-row"><span class="info-label">Session</span><span class="fw-semibold">${s.session_name}</span></div>
+                        <div class="info-row"><span class="info-label">Date</span><span class="fw-semibold">${s.session_date}</span></div>
+                        <div class="info-row"><span class="info-label">Food</span><span class="fw-semibold">${s.food_item || '-'}</span></div>
+                    </div>
+                    <div class="mt-3">${statusBadge}</div>
+                    <p class="footer-note">Please show this QR code to the admin at the food counter.</p>
+                `;
+            } catch (err) {
+                container.innerHTML = `<p class="text-danger fw-semibold">❌ Something went wrong loading this coupon.</p>`;
+            }
+        }
+
+        loadCoupon();
+    </script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Coupon - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body { background: #f4f6f9; }
+        .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; }
+        .result-box { border-radius: 12px; padding: 1.25rem; margin-top: 1rem; }
+        .result-valid { background: #d1e7dd; border: 1px solid #a3cfbb; }
+        .result-used { background: #f8d7da; border: 1px solid #f1aeb5; }
+        .result-invalid { background: #f8d7da; border: 1px solid #f1aeb5; }
+        .result-wrong-session { background: #fff3cd; border: 1px solid #ffe69c; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/dashboard">🍽️ Food Coupon Generator</a>
+            <a href="/dashboard" class="btn btn-outline-secondary btn-sm">Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="card p-4">
+                    <h5 class="fw-bold mb-3">Scan Coupon</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Session (optional - validates coupon belongs to this session)</label>
+                        <select class="form-select" id="sessionSelect">
+                            <option value="">Any session</option>
+                        </select>
+                    </div>
+
+                    <div id="reader"></div>
+                    <button id="restartBtn" class="btn btn-outline-secondary w-100 mt-3 d-none">Scan Another</button>
+
+                    <div id="resultBox" class="result-box d-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        if (!token) window.location.href = '/';
+        const authHeaders = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+
+        let scanning = true;
+
+        async function loadSessions() {
+            const res = await fetch('/api/sessions', { headers: authHeaders });
+            const data = await res.json();
+            const select = document.getElementById('sessionSelect');
+            (data.sessions || []).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.session_name} (${s.session_date})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function renderResult(data) {
+            const box = document.getElementById('resultBox');
+            box.classList.remove('d-none', 'result-valid', 'result-used', 'result-invalid', 'result-wrong-session');
+
+            let html = '';
+            if (data.result === 'REDEEMED') {
+                box.classList.add('result-valid');
+                html = `
+                    <h5 class="mb-2">✅ COUPON VALID</h5>
+                    <p class="mb-1"><strong>Coupon:</strong> ${data.coupon.coupon_code}</p>
+                    <p class="mb-1"><strong>Session:</strong> ${data.session?.session_name || '-'}</p>
+                    <p class="mb-1"><strong>Food:</strong> ${data.session?.food_item || '-'}</p>
+                    <p class="mb-0 fw-bold text-success">Redeemed Successfully</p>
+                `;
+            } else if (data.result === 'ALREADY_USED') {
+                box.classList.add('result-used');
+                const redeemedAt = data.coupon.redeemed_at ? new Date(data.coupon.redeemed_at).toLocaleString() : '-';
+                html = `
+                    <h5 class="mb-2">❌ COUPON ALREADY USED</h5>
+                    <p class="mb-1"><strong>Coupon:</strong> ${data.coupon.coupon_code}</p>
+                    <p class="mb-0">This coupon has already been redeemed.</p>
+                    <p class="mb-0"><strong>Redeemed at:</strong> ${redeemedAt}</p>
+                `;
+            } else if (data.result === 'WRONG_SESSION') {
+                box.classList.add('result-wrong-session');
+                html = `
+                    <h5 class="mb-2">⚠️ COUPON NOT VALID FOR THIS SESSION</h5>
+                    <p class="mb-0">This coupon belongs to another session/date.</p>
+                `;
+            } else {
+                box.classList.add('result-invalid');
+                html = `
+                    <h5 class="mb-2">❌ INVALID COUPON</h5>
+                    <p class="mb-0">This coupon does not exist or is not valid.</p>
+                `;
+            }
+            box.innerHTML = html;
+            document.getElementById('restartBtn').classList.remove('d-none');
+        }
+
+        async function onScanSuccess(decodedText) {
+            if (!scanning) return;
+            scanning = false;
+            html5QrCode.pause();
+
+            const sessionId = document.getElementById('sessionSelect').value || null;
+
+            try {
+                const res = await fetch('/api/coupons/redeem', {
+                    method: 'POST',
+                    headers: authHeaders,
+                    body: JSON.stringify({ token: decodedText, session_id: sessionId })
+                });
+                const data = await res.json();
+                renderResult(data);
+            } catch (err) {
+                renderResult({ result: 'INVALID' });
+            }
+        }
+
+        const html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            onScanSuccess
+        ).catch(err => {
+            document.getElementById('reader').innerHTML =
+                '<div class="alert alert-danger">❌ Camera Permission Denied or unavailable. Please allow camera access and reload.</div>';
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('resultBox').classList.add('d-none');
+            document.getElementById('restartBtn').classList.add('d-none');
+            scanning = true;
+            html5QrCode.resume();
+        });
+
+        loadSessions();
+    </script>
+</body>
+</html>

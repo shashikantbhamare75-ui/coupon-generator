@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Coupons - Food Coupon Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; }
+        .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/dashboard">🍽️ Food Coupon Generator</a>
+            <a href="/sessions" class="btn btn-outline-secondary btn-sm">Back to Sessions</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="card p-4">
+                    <div id="loadingState" class="text-center py-4">
+                        <p class="text-muted">Loading session details...</p>
+                    </div>
+
+                    <div id="content" class="d-none">
+                        <h5 class="fw-bold mb-3" id="sessionTitle"></h5>
+                        <p class="text-muted mb-1" id="sessionMeta"></p>
+                        <p class="mb-4" id="attendeeInfo"></p>
+
+                        <div id="alreadyGeneratedBox" class="alert alert-warning d-none"></div>
+                        <div id="resultBox" class="alert alert-success d-none"></div>
+
+                        <button id="generateBtn" class="btn btn-primary w-100 fw-semibold">Generate Coupons</button>
+                        <a id="viewCouponsLink" href="#" class="btn btn-outline-primary w-100 fw-semibold mt-2 d-none">View Coupons</a>
+                        <a id="downloadPdfLink" href="#" class="btn btn-outline-success w-100 fw-semibold mt-2 d-none" target="_blank">Download PDF</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        if (!token) window.location.href = '/';
+
+        const authHeaders = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+        const sessionId = window.location.pathname.split('/')[2];
+
+        async function loadSession() {
+            const res = await fetch(`/api/sessions/${sessionId}`, { headers: authHeaders });
+            const data = await res.json();
+
+            document.getElementById('loadingState').classList.add('d-none');
+            document.getElementById('content').classList.remove('d-none');
+
+            const s = data.session;
+            document.getElementById('sessionTitle').textContent = s.session_name;
+            document.getElementById('sessionMeta').textContent = `${s.session_date} · ${s.food_item || 'No food item set'}`;
+            document.getElementById('attendeeInfo').textContent = `Attendees: ${s.attendee_count}`;
+
+            const viewLink = document.getElementById('viewCouponsLink');
+            viewLink.href = `/coupons?session_id=${sessionId}`;
+
+            const pdfLink = document.getElementById('downloadPdfLink');
+            pdfLink.href = `/api/coupons/pdf/${sessionId}?token=${token}`;
+
+            if (s.coupons_generated) {
+                const box = document.getElementById('alreadyGeneratedBox');
+                box.classList.remove('d-none');
+                box.textContent = `⚠️ Coupons already generated for this session (${s.stats.total_coupons} coupons). Generating again is disabled.`;
+                document.getElementById('generateBtn').disabled = true;
+                viewLink.classList.remove('d-none');
+                pdfLink.classList.remove('d-none');
+            }
+        }
+
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+
+            try {
+                const res = await fetch(`/api/coupons/generate/${sessionId}`, {
+                    method: 'POST',
+                    headers: authHeaders
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    const box = document.getElementById('resultBox');
+                    box.classList.remove('d-none');
+                    box.textContent = `✅ ${data.message}`;
+                    document.getElementById('viewCouponsLink').classList.remove('d-none');
+                    document.getElementById('downloadPdfLink').classList.remove('d-none');
+                    btn.classList.add('d-none');
+                } else {
+                    alert(data.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Generate Coupons';
+                }
+            } catch (err) {
+                alert('Something went wrong. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Generate Coupons';
+            }
+        });
+
+        loadSession();
+    </script>
+</body>
+</html>
